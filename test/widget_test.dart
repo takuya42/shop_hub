@@ -5,6 +5,7 @@ import 'package:shop_hub/main.dart';
 import 'package:shop_hub/data/providers.dart';
 import 'package:shop_hub/data/shop_repository.dart';
 import 'package:shop_hub/models/shop_models.dart';
+import 'shop_fixtures.dart';
 
 void main() {
   test('mock CRUD persists and isolates shops', () async {
@@ -45,11 +46,11 @@ void main() {
   });
   test('URL IDs reject duplicates and invalid forms', () async {
     final repo = MockShopRepository();
-    expect(await repo.isSlugAvailable('atelier', 'other'), isFalse);
-    expect(await repo.isSlugAvailable('atelier', 'demo'), isTrue);
+    expect(await repo.isSlugAvailable('shop', 'other'), isFalse);
+    expect(await repo.isSlugAvailable('shop', 'demo'), isTrue);
     await expectLater(
       repo.saveShop(
-        const Shop(id: 'other', name: '別店舗', description: '', slug: 'atelier'),
+        const Shop(id: 'other', name: '別店舗', description: '', slug: 'shop'),
       ),
       throwsStateError,
     );
@@ -60,18 +61,36 @@ void main() {
       throwsArgumentError,
     );
   });
-  testWidgets('dashboard loads sample metrics', (tester) async {
+  test(
+    'repository starts without sample products, orders or shop information',
+    () async {
+      final repo = MockShopRepository();
+      expect(await repo.loadProducts('demo'), isEmpty);
+      expect(await repo.loadOrders('demo'), isEmpty);
+      final shop = await repo.loadShop('demo');
+      expect(shop.name, isEmpty);
+      expect(shop.description, isEmpty);
+      expect(shop.published, isFalse);
+    },
+  );
+  testWidgets('dashboard starts with zero metrics and no orders', (
+    tester,
+  ) async {
     await tester.pumpWidget(const ProviderScope(child: ShopHubApp()));
     await tester.pumpAndSettle();
-    expect(find.text('登録商品数'), findsOneWidget);
-    expect(find.text('4点'), findsOneWidget);
-    expect(find.text('3点'), findsOneWidget);
+    expect(find.text('今月の売上'), findsOneWidget);
+    expect(find.text('¥0'), findsOneWidget);
+    expect(find.text('0件'), findsOneWidget);
+    expect(find.text('0点'), findsNWidgets(2));
+    expect(find.text('注文はまだありません'), findsOneWidget);
+    expect(find.text('ショップ名を設定してください'), findsOneWidget);
   });
   testWidgets('store hides unpublished products and private shops', (
     tester,
   ) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await seedShop(container.read(repositoryProvider));
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -79,10 +98,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    container.read(routerProvider).go('/shop/atelier');
+    container.read(routerProvider).go('/shop/test-shop');
     await tester.pumpAndSettle();
-    expect(find.text('キャンバストートバッグ'), findsOneWidget);
-    expect(find.text('季節のポストカードセット'), findsNothing);
+    expect(find.text('公開商品'), findsOneWidget);
+    expect(find.text('非公開商品'), findsNothing);
     final shop = await container.read(repositoryProvider).loadShop('demo');
     await container
         .read(repositoryProvider)
@@ -98,7 +117,7 @@ void main() {
     container.invalidate(shopProvider('demo'));
     await tester.pumpAndSettle();
     expect(find.text('ただいま準備中です'), findsOneWidget);
-    expect(find.text('キャンバストートバッグ'), findsNothing);
+    expect(find.text('公開商品'), findsNothing);
   });
   testWidgets('mobile drawer routes to product registration', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -128,7 +147,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     final router = container.read(routerProvider);
-    router.go('/admin/products/new');
+    router.go('/admin/products');
+    await tester.pumpAndSettle();
+    expect(find.text('商品がまだ登録されていません'), findsOneWidget);
+    await tester.tap(find.text('商品を登録する'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.at(0), 'テスト商品');
@@ -150,6 +172,10 @@ void main() {
     )).singleWhere((p) => p.name == 'テスト商品');
     expect(product.published, isFalse);
     expect(product.price, 1800);
+    router.go('/admin');
+    await tester.pumpAndSettle();
+    expect(find.text('1点'), findsOneWidget);
+    expect(find.text('0点'), findsOneWidget);
     router.go('/admin/products/${product.id}/edit');
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), '編集した商品');
@@ -165,7 +191,23 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('キャンバストートバッグ'), findsNothing);
+    expect(find.text('公開商品'), findsNothing);
+    await tester.enterText(find.byType(TextField).first, '一致しない検索語');
+    await tester.pumpAndSettle();
+    expect(find.text('該当する商品がありません'), findsOneWidget);
+    expect(find.text('商品がまだ登録されていません'), findsNothing);
+    await tester.enterText(find.byType(TextField).first, '編集した商品');
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(Switch));
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    router.go('/admin');
+    await tester.pumpAndSettle();
+    expect(find.text('1点'), findsNWidgets(2));
+    expect(find.text('¥0'), findsOneWidget);
+    expect(find.text('0件'), findsOneWidget);
+    router.go('/admin/products');
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('削除'));
     await tester.tap(find.byTooltip('削除'));
     await tester.pumpAndSettle();
@@ -175,20 +217,25 @@ void main() {
       (await repo.loadProducts('demo')).any((p) => p.id == product.id),
       isFalse,
     );
+    expect(find.text('商品がまだ登録されていません'), findsOneWidget);
+    router.go('/admin');
+    await tester.pumpAndSettle();
+    expect(find.text('0点'), findsNWidgets(2));
   });
   testWidgets('private product URL does not reveal details', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
+    await seedShop(container.read(repositoryProvider));
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const ShopHubApp(),
       ),
     );
-    container.read(routerProvider).go('/shop/atelier/products/p4');
+    container.read(routerProvider).go('/shop/test-shop/products/p4');
     await tester.pumpAndSettle();
     expect(find.text('商品が見つかりません'), findsOneWidget);
-    expect(find.text('季節のポストカードセット'), findsNothing);
+    expect(find.text('非公開商品'), findsNothing);
   });
   testWidgets('shop settings persist and update the public URL', (
     tester,
@@ -206,6 +253,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), '新しいショップ');
     await tester.enterText(find.byType(TextFormField).at(2), 'new-shop');
+    await tester.ensureVisible(find.byType(Switch));
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('設定を保存'));
     await tester.tap(find.text('設定を保存'));
     await tester.pumpAndSettle();
@@ -213,7 +263,7 @@ void main() {
       (await container.read(repositoryProvider).loadShop('demo')).slug,
       'new-shop',
     );
-    router.go('/shop/atelier');
+    router.go('/shop/shop');
     await tester.pumpAndSettle();
     expect(find.text('ショップが見つかりません'), findsOneWidget);
     router.go('/shop/new-shop');
@@ -227,8 +277,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        ordersProvider('demo').overrideWith((ref) async => testOrders),
+      ],
+    );
     addTearDown(container.dispose);
+    await seedShop(container.read(repositoryProvider));
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -240,10 +295,10 @@ void main() {
       '/admin/products/p1',
       '/admin/products/p1/edit',
       '/admin/orders',
-      '/admin/orders/SH-1003',
+      '/admin/orders/TEST-ORDER',
       '/admin/settings',
-      '/shop/atelier',
-      '/shop/atelier/products/p1',
+      '/shop/test-shop',
+      '/shop/test-shop/products/p1',
     ]) {
       container.read(routerProvider).go(path);
       await tester.pumpAndSettle();
