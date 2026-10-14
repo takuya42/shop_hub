@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "584275274529",
+    "project_id": "shop-hub-cf428",
+    "storage_bucket": "shop-hub-cf428.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:584275274529:android:ba67f94aa6b5d0da2d6c60",
+        "android_client_info": {
+          "package_name": "com.example.shop_hub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEmAZVI6qif8pnwA-CixN0fzDxsQcFCOQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
