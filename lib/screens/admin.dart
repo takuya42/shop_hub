@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../data/providers.dart';
 import '../models/shop_models.dart';
 import 'common.dart';
+import 'product_form_widgets.dart';
 
 const demoShopId = 'demo';
 
@@ -14,91 +15,220 @@ class AdminShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
-    Widget menu() => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                'shop_hub',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ),
-            const Text('ショップ管理', style: TextStyle(color: Colors.blueGrey)),
-            const SizedBox(height: 24),
-            for (final item in [
-              (Icons.space_dashboard_outlined, 'ダッシュボード', '/admin'),
-              (Icons.inventory_2_outlined, '商品管理', '/admin/products'),
-              (Icons.receipt_long_outlined, '注文管理', '/admin/orders'),
-              (Icons.tune, 'ショップ設定', '/admin/settings'),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  selected: item.$3 == '/admin'
-                      ? path == '/admin'
-                      : path.startsWith(item.$3),
-                  selectedTileColor: const Color(0xFFEAF1FF),
-                  leading: Icon(item.$1),
-                  title: Text(item.$2),
-                  onTap: () {
-                    if (!wide) Navigator.pop(context);
-                    context.go(item.$3);
-                  },
-                ),
-              ),
-            const Spacer(),
-            const Text(
-              'デモワークスペース',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'データは起動中のみ保存されます。\n注文はサンプルデータです。',
-              style: TextStyle(fontSize: 12, color: Colors.blueGrey),
-            ),
-          ],
+    // Isolate the nested navigator so route semantics keep the menu and header accessible.
+    final content = Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: child,
+    );
+    final base = Theme.of(context);
+    final theme = base.copyWith(
+      scaffoldBackgroundColor: const Color(0xFFF5F6F8),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
         ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF334155),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+          side: const BorderSide(color: Color(0xFFCBD5E1)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFFE5E7EB),
+        thickness: 1,
+      ),
+    );
+    Widget menu() => SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 30, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'shop_hub',
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'ショップ管理',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                for (final item in <(IconData, String, String?)>[
+                  (Icons.home_outlined, 'ホーム', '/admin'),
+                  (Icons.inventory_2_outlined, '商品管理', '/admin/products'),
+                  (Icons.receipt_long_outlined, '注文管理', '/admin/orders'),
+                  (Icons.people_outline, '顧客管理', null),
+                  (Icons.payments_outlined, '売上管理', null),
+                  (Icons.bar_chart_outlined, 'データ分析', null),
+                  (Icons.palette_outlined, 'ショップデザイン', null),
+                  (Icons.tune, 'ショップ設定', '/admin/settings'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                      ),
+                      minLeadingWidth: 22,
+                      horizontalTitleGap: 12,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      selected:
+                          item.$3 != null &&
+                          (item.$3 == '/admin'
+                              ? path == '/admin'
+                              : path.startsWith(item.$3!)),
+                      selectedTileColor: const Color(0xFFEFF6FF),
+                      selectedColor: const Color(0xFF2563EB),
+                      enabled: item.$3 != null,
+                      leading: Icon(item.$1, size: 21),
+                      title: Text(
+                        item.$2,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      trailing: item.$3 == null
+                          ? const Text(
+                              '準備中',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            )
+                          : null,
+                      onTap: item.$3 == null
+                          ? null
+                          : () {
+                              if (!wide) Navigator.pop(context);
+                              context.go(item.$3!);
+                            },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'デモワークスペース',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'データは起動中のみ保存されます。',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
     final shop = ref.watch(shopProvider(demoShopId)).asData?.value;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          shop?.name ?? 'ショップ管理',
-          style: const TextStyle(fontSize: 16),
-        ),
-        actions: [
-          if (shop != null)
-            TextButton.icon(
-              onPressed: () => context.go('/shop/${shop.slug}'),
-              icon: const Icon(Icons.open_in_new, size: 18),
-              label: const Text('ショップを見る'),
-            ),
-          const SizedBox(width: 16),
-        ],
+    final appBar = AppBar(
+      title: Text(
+        shop?.name ?? 'ショップ管理',
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
       ),
-      drawer: wide ? null : Drawer(child: menu()),
-      body: Row(
-        children: [
-          if (wide)
-            SizedBox(
-              width: 250,
-              child: ColoredBox(color: Colors.white, child: menu()),
+      elevation: 0,
+      shape: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+      actions: [
+        if (shop != null)
+          TextButton.icon(
+            onPressed: () => context.go('/shop/${shop.slug}'),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('ショップを見る'),
+          ),
+        const SizedBox(width: 16),
+      ],
+    );
+    return Theme(
+      data: theme,
+      child: wide
+          ? Scaffold(
+              body: Row(
+                children: [
+                  Container(
+                    width: 264,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        right: BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                    ),
+                    child: Material(color: Colors.white, child: menu()),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        SizedBox(height: 64, child: appBar),
+                        Expanded(child: content),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Scaffold(
+              appBar: appBar,
+              drawer: Drawer(backgroundColor: Colors.white, child: menu()),
+              body: content,
             ),
-          Expanded(child: child),
-        ],
-      ),
     );
   }
 }
@@ -423,85 +553,178 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
+      TextButton.icon(
+        onPressed: saving ? null : () => context.go('/admin/products'),
+        icon: const Icon(Icons.chevron_left, size: 18),
+        label: const Text('商品管理に戻る'),
+      ),
+      const SizedBox(height: 14),
       PageHeading(
-        widget.product == null ? '商品を登録' : '商品を編集',
-        '商品の魅力が伝わる情報を入力しましょう。',
+        widget.product == null ? '商品登録' : '商品編集',
+        '商品情報を入力し、公開状態を設定してください。',
       ),
       Card(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width >= 900 ? 32 : 20,
+          ),
           child: Form(
             key: form,
             child: Column(
               children: [
-                const ImagePlaceholder(),
-                const SizedBox(height: 12),
-                const Text(
-                  '画像アップロードは今後対応予定です',
-                  style: TextStyle(color: Colors.blueGrey),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: name,
-                  maxLength: 100,
-                  decoration: const InputDecoration(labelText: '商品名'),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? '商品名を入力してください' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: description,
-                  maxLines: 4,
-                  maxLength: 2000,
-                  decoration: const InputDecoration(labelText: '商品説明'),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: price,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '販売価格（円）'),
-                  validator: number,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: stock,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '在庫数'),
-                  validator: number,
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('商品を公開する'),
-                  value: published,
-                  onChanged: saving
-                      ? null
-                      : (v) => setState(() => published = v),
-                ),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    OutlinedButton(
-                      onPressed: saving
-                          ? null
-                          : () => context.go('/admin/products'),
-                      child: const Text('キャンセル'),
+                ProductFormRow(
+                  label: '商品名',
+                  requiredField: true,
+                  child: TextFormField(
+                    controller: name,
+                    maxLength: 100,
+                    decoration: const InputDecoration(
+                      hintText: '例：キャンバストートバッグ',
+                      counterText: '',
+                      helperText: '100文字以内で入力してください',
                     ),
-                    FilledButton(
-                      onPressed: saving ? null : save,
-                      child: Text(saving ? '保存中…' : '商品を保存'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? '商品名を入力してください' : null,
+                  ),
+                ),
+                const ProductFormRow(label: '商品画像', child: ProductImageInput()),
+                ProductFormRow(
+                  label: '商品説明',
+                  child: TextFormField(
+                    controller: description,
+                    maxLines: 6,
+                    maxLength: 2000,
+                    decoration: const InputDecoration(
+                      hintText: '素材、サイズ、使い方など、商品の特徴を入力してください',
+                      helperText: '購入者に伝えたい商品の魅力を記載してください',
                     ),
-                  ],
+                  ),
+                ),
+                ProductFormRow(
+                  label: '販売価格',
+                  requiredField: true,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: TextFormField(
+                        controller: price,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          prefixText: '¥  ',
+                          suffixText: '円',
+                          hintText: '0',
+                          helperText: '円単位の整数で入力してください',
+                        ),
+                        validator: number,
+                      ),
+                    ),
+                  ),
+                ),
+                ProductFormRow(
+                  label: '在庫数',
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 360),
+                      child: TextFormField(
+                        controller: stock,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          suffixText: '点',
+                          helperText: '在庫が0の場合は在庫なしと表示されます',
+                        ),
+                        validator: number,
+                      ),
+                    ),
+                  ),
+                ),
+                ProductFormRow(
+                  label: '公開設定',
+                  last: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          published ? '公開' : '非公開',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          '公開するとショップページに表示されます',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        value: published,
+                        onChanged: saving
+                            ? null
+                            : (v) => setState(() => published = v),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ショップ自体が非公開の場合、商品は表示されません。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ),
       ),
+      const SizedBox(height: 24),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            TextButton(
+              onPressed: saving ? null : () => context.go('/admin/products'),
+              child: const Text('キャンセル'),
+            ),
+            OutlinedButton.icon(
+              onPressed: saving ? null : preview,
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('プレビュー'),
+            ),
+            FilledButton(
+              onPressed: saving ? null : save,
+              child: Text(
+                saving
+                    ? '保存中…'
+                    : widget.product == null
+                    ? '商品を登録'
+                    : '変更を保存',
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
     ],
   );
+
+  Future<void> preview() async {
+    if (!form.currentState!.validate()) return;
+    await showProductPreview(
+      context,
+      name: name.text.trim(),
+      description: description.text.trim(),
+      price: int.parse(price.text),
+      stock: int.parse(stock.text),
+      published: published,
+    );
+  }
+
   Future<void> save() async {
     if (!form.currentState!.validate()) return;
     setState(() => saving = true);
