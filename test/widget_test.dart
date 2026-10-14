@@ -135,7 +135,7 @@ void main() {
     await tester.enterText(fields.at(1), '新しい商品の説明');
     await tester.enterText(fields.at(2), '-1');
     await tester.enterText(fields.at(3), '3');
-    final save = find.text('商品を保存');
+    final save = find.text('商品を登録');
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pumpAndSettle();
@@ -153,8 +153,8 @@ void main() {
     router.go('/admin/products/${product.id}/edit');
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), '編集した商品');
-    await tester.ensureVisible(find.text('商品を保存'));
-    await tester.tap(find.text('商品を保存'));
+    await tester.ensureVisible(find.text('変更を保存'));
+    await tester.tap(find.text('変更を保存'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, '編集した商品');
     await tester.pumpAndSettle();
