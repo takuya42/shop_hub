@@ -1,3 +1,5 @@
+import 'product_image.dart';
+
 class Product {
   const Product({
     required this.id,
@@ -7,10 +9,22 @@ class Product {
     required this.price,
     required this.stock,
     this.published = true,
+    this.images = const [],
   });
   final String id, shopId, name, description;
   final int price, stock;
   final bool published;
+  final List<ProductImage> images;
+  Product withImages(List<ProductImage> value) => Product(
+    id: id,
+    shopId: shopId,
+    name: name,
+    description: description,
+    price: price,
+    stock: stock,
+    published: published,
+    images: List.unmodifiable(value),
+  );
 }
 
 class Shop {

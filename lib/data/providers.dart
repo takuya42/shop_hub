@@ -1,3 +1,5 @@
+import 'images/image_storage.dart';
+import 'images/product_image_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/shop_models.dart';
 import 'shop_repository.dart';
@@ -27,3 +29,10 @@ String yen(int value) =>
     '¥${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},')}';
 String orderDate(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+final productImageServiceProvider = Provider<ProductImageService>(
+  (ref) => ProductImageService(
+    ref.watch(repositoryProvider),
+    ref.watch(imageStorageProvider),
+  ),
+);

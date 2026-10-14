@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../data/providers.dart';
 import '../models/shop_models.dart';
 import 'common.dart';
+import 'product_images.dart';
 
 class StorePage extends ConsumerStatefulWidget {
   const StorePage({super.key, required this.slug, this.productId});
@@ -171,7 +172,10 @@ class _StorePageState extends ConsumerState<StorePage> {
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
                                                 children: [
-                                                  const ImagePlaceholder(
+                                                  ProductImageView(
+                                                    image: p.images.isEmpty
+                                                        ? null
+                                                        : p.images.first,
                                                     height: 220,
                                                   ),
                                                   const SizedBox(height: 18),
@@ -312,14 +316,24 @@ class ProductPresentation extends StatelessWidget {
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Expanded(child: ImagePlaceholder(height: 400)),
+                    Expanded(
+                      child: ProductImageGallery(
+                        key: ValueKey(product.id),
+                        images: product.images,
+                        height: 400,
+                      ),
+                    ),
                     const SizedBox(width: 40),
                     Expanded(child: details),
                   ],
                 )
               : Column(
                   children: [
-                    const ImagePlaceholder(height: 280),
+                    ProductImageGallery(
+                      key: ValueKey(product.id),
+                      images: product.images,
+                      height: 280,
+                    ),
                     const SizedBox(height: 28),
                     details,
                   ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/providers.dart';
-import 'common.dart';
+import '../models/product_image.dart';
+import 'product_images.dart';
 
 /// Keep labels separate from controls while preserving accessible field labels.
 class ProductFormRow extends StatelessWidget {
@@ -77,12 +78,22 @@ class ProductFormRow extends StatelessWidget {
 }
 
 class ProductImageInput extends StatelessWidget {
-  const ProductImageInput({super.key});
+  const ProductImageInput({
+    super.key,
+    required this.onSelect,
+    this.disabled = false,
+    this.highlighted = false,
+  });
+  final VoidCallback onSelect;
+  final bool disabled, highlighted;
   @override
   Widget build(BuildContext context) => CustomPaint(
-    painter: const _DashedBorder(),
+    painter: _DashedBorder(highlighted),
     child: Container(
       width: double.infinity,
+      color: highlighted
+          ? const Color(0xFF2563EB).withValues(alpha: 0.06)
+          : null,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       child: Column(
         children: [
@@ -100,20 +111,19 @@ class ProductImageInput extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            '商品の魅力が伝わる画像を追加',
+            'ここに画像をドラッグ＆ドロップ',
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () =>
-                showMessage(context, '画像アップロードは準備中です。現在は画像を保存しません。'),
+            onPressed: disabled ? null : onSelect,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('画像を選択'),
           ),
           const SizedBox(height: 12),
           const Text(
-            '画像アップロードは準備中です',
+            'JPEG・PNG・WebP / 最大5枚 / 1枚5MBまで',
             style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         ],
@@ -123,11 +133,12 @@ class ProductImageInput extends StatelessWidget {
 }
 
 class _DashedBorder extends CustomPainter {
-  const _DashedBorder();
+  const _DashedBorder(this.highlighted);
+  final bool highlighted;
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFCBD5E1)
+      ..color = highlighted ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     final path = Path()
@@ -148,7 +159,8 @@ class _DashedBorder extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DashedBorder oldDelegate) => false;
+  bool shouldRepaint(covariant _DashedBorder oldDelegate) =>
+      highlighted != oldDelegate.highlighted;
 }
 
 Future<void> showProductPreview(
@@ -158,6 +170,7 @@ Future<void> showProductPreview(
   required int price,
   required int stock,
   required bool published,
+  List<ProductImage> images = const [],
 }) => showDialog<void>(
   context: context,
   builder: (context) => AlertDialog(
@@ -173,7 +186,7 @@ Future<void> showProductPreview(
             style: TextStyle(fontSize: 12, color: Colors.blueGrey),
           ),
           const SizedBox(height: 18),
-          const ImagePlaceholder(height: 220),
+          ProductImageGallery(images: images, height: 220),
           const SizedBox(height: 20),
           Text(name, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),

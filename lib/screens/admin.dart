@@ -5,6 +5,10 @@ import '../data/providers.dart';
 import '../models/shop_models.dart';
 import 'common.dart';
 import 'product_form_widgets.dart';
+import 'product_image_editor.dart';
+import 'product_images.dart';
+import '../data/images/image_draft.dart';
+import '../data/images/image_storage.dart';
 
 const demoShopId = 'demo';
 
@@ -452,9 +456,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                         runSpacing: 12,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 64,
-                            child: ImagePlaceholder(height: 64),
+                            child: ProductImageView(
+                              image: p.images.isEmpty ? null : p.images.first,
+                              height: 64,
+                            ),
                           ),
                           SizedBox(
                             width: 220,
@@ -486,6 +493,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                                         price: p.price,
                                         stock: p.stock,
                                         published: value,
+                                        images: p.images,
                                       ),
                                     );
                                 ref.invalidate(productsProvider(demoShopId));
@@ -508,8 +516,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                               if (!await confirmDelete(context, p.name)) return;
                               try {
                                 await ref
-                                    .read(repositoryProvider)
-                                    .deleteProduct(p.shopId, p.id);
+                                    .read(productImageServiceProvider)
+                                    .delete(p);
                                 ref.invalidate(productsProvider(demoShopId));
                                 if (context.mounted) {
                                   showMessage(context, '商品を削除しました');
@@ -564,11 +572,16 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   final form = GlobalKey<FormState>();
   late final TextEditingController name, description, price, stock;
   late bool published;
-  bool saving = false;
+  bool saving = false, previewing = false;
+  double uploadProgress = 0;
+  late final ImageDraftKey imageKey;
+  late final String productId;
   @override
   void initState() {
     super.initState();
     final p = widget.product;
+    imageKey = ImageDraftKey(p?.images ?? const []);
+    productId = p?.id ?? 'p${DateTime.now().microsecondsSinceEpoch}';
     name = TextEditingController(text: p?.name);
     description = TextEditingController(text: p?.description);
     price = TextEditingController(text: p?.price.toString());
@@ -593,205 +606,248 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      TextButton.icon(
-        onPressed: saving ? null : () => context.go('/admin/products'),
-        icon: const Icon(Icons.chevron_left, size: 18),
-        label: const Text('商品管理に戻る'),
-      ),
-      const SizedBox(height: 14),
-      PageHeading(
-        widget.product == null ? '商品登録' : '商品編集',
-        '商品情報を入力し、公開状態を設定してください。',
-      ),
-      Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: MediaQuery.sizeOf(context).width >= 900 ? 32 : 20,
-          ),
-          child: Form(
-            key: form,
-            child: Column(
-              children: [
-                ProductFormRow(
-                  label: '商品名',
-                  requiredField: true,
-                  child: TextFormField(
-                    controller: name,
-                    maxLength: 100,
-                    decoration: const InputDecoration(
-                      hintText: '例：キャンバストートバッグ',
-                      counterText: '',
-                      helperText: '100文字以内で入力してください',
-                    ),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? '商品名を入力してください' : null,
-                  ),
-                ),
-                const ProductFormRow(label: '商品画像', child: ProductImageInput()),
-                ProductFormRow(
-                  label: '商品説明',
-                  child: TextFormField(
-                    controller: description,
-                    maxLines: 6,
-                    maxLength: 2000,
-                    decoration: const InputDecoration(
-                      hintText: '素材、サイズ、使い方など、商品の特徴を入力してください',
-                      helperText: '購入者に伝えたい商品の魅力を記載してください',
+  Widget build(BuildContext context) {
+    final draft = ref.watch(imageDraftProvider(imageKey));
+    final busy = saving || draft.reading || previewing;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: busy ? null : () => context.go('/admin/products'),
+          icon: const Icon(Icons.chevron_left, size: 18),
+          label: const Text('商品管理に戻る'),
+        ),
+        const SizedBox(height: 14),
+        PageHeading(
+          widget.product == null ? '商品登録' : '商品編集',
+          '商品情報を入力し、公開状態を設定してください。',
+        ),
+        Card(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.sizeOf(context).width >= 900 ? 32 : 20,
+            ),
+            child: Form(
+              key: form,
+              child: Column(
+                children: [
+                  ProductFormRow(
+                    label: '商品名',
+                    requiredField: true,
+                    child: TextFormField(
+                      controller: name,
+                      maxLength: 100,
+                      decoration: const InputDecoration(
+                        hintText: '例：キャンバストートバッグ',
+                        counterText: '',
+                        helperText: '100文字以内で入力してください',
+                      ),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? '商品名を入力してください' : null,
                     ),
                   ),
-                ),
-                ProductFormRow(
-                  label: '販売価格',
-                  requiredField: true,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: TextFormField(
-                        controller: price,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          prefixText: '¥  ',
-                          suffixText: '円',
-                          hintText: '0',
-                          helperText: '円単位の整数で入力してください',
-                        ),
-                        validator: number,
+                  ProductFormRow(
+                    label: '商品画像',
+                    child: ProductImageEditor(
+                      draftKey: imageKey,
+                      disabled: saving || previewing,
+                    ),
+                  ),
+                  ProductFormRow(
+                    label: '商品説明',
+                    child: TextFormField(
+                      controller: description,
+                      maxLines: 6,
+                      maxLength: 2000,
+                      decoration: const InputDecoration(
+                        hintText: '素材、サイズ、使い方など、商品の特徴を入力してください',
+                        helperText: '購入者に伝えたい商品の魅力を記載してください',
                       ),
                     ),
                   ),
-                ),
-                ProductFormRow(
-                  label: '在庫数',
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: TextFormField(
-                        controller: stock,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          suffixText: '点',
-                          helperText: '在庫が0の場合は在庫なしと表示されます',
+                  ProductFormRow(
+                    label: '販売価格',
+                    requiredField: true,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: TextFormField(
+                          controller: price,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            prefixText: '¥  ',
+                            suffixText: '円',
+                            hintText: '0',
+                            helperText: '円単位の整数で入力してください',
+                          ),
+                          validator: number,
                         ),
-                        validator: number,
                       ),
                     ),
                   ),
-                ),
-                ProductFormRow(
-                  label: '公開設定',
-                  last: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          published ? '公開' : '非公開',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                  ProductFormRow(
+                    label: '在庫数',
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: TextFormField(
+                          controller: stock,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            suffixText: '点',
+                            helperText: '在庫が0の場合は在庫なしと表示されます',
+                          ),
+                          validator: number,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ProductFormRow(
+                    label: '公開設定',
+                    last: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            published ? '公開' : '非公開',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            '公開するとショップページに表示されます',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          value: published,
+                          onChanged: busy
+                              ? null
+                              : (v) => setState(() => published = v),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'ショップ自体が非公開の場合、商品は表示されません。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
                           ),
                         ),
-                        subtitle: const Text(
-                          '公開するとショップページに表示されます',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        value: published,
-                        onChanged: saving
-                            ? null
-                            : (v) => setState(() => published = v),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'ショップ自体が非公開の場合、商品は表示されません。',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (saving && ref.watch(imageStorageProvider).remoteEnabled)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              children: [
+                LinearProgressIndicator(value: uploadProgress),
+                const SizedBox(height: 8),
+                Text('画像をアップロード中… ${(uploadProgress * 100).round()}%'),
               ],
             ),
           ),
-        ),
-      ),
-      const SizedBox(height: 24),
-      Align(
-        alignment: Alignment.centerRight,
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            TextButton(
-              onPressed: saving ? null : () => context.go('/admin/products'),
-              child: const Text('キャンセル'),
-            ),
-            OutlinedButton.icon(
-              onPressed: saving ? null : preview,
-              icon: const Icon(Icons.visibility_outlined, size: 18),
-              label: const Text('プレビュー'),
-            ),
-            FilledButton(
-              onPressed: saving ? null : save,
-              child: Text(
-                saving
-                    ? '保存中…'
-                    : widget.product == null
-                    ? '商品を登録'
-                    : '変更を保存',
+        Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              TextButton(
+                onPressed: busy ? null : () => context.go('/admin/products'),
+                child: const Text('キャンセル'),
               ),
-            ),
-          ],
+              OutlinedButton.icon(
+                onPressed: busy ? null : preview,
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('プレビュー'),
+              ),
+              FilledButton(
+                onPressed: busy ? null : save,
+                child: Text(
+                  saving
+                      ? '保存中…'
+                      : widget.product == null
+                      ? '商品を登録'
+                      : '変更を保存',
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 24),
-    ],
-  );
-
-  Future<void> preview() async {
-    if (!form.currentState!.validate()) return;
-    await showProductPreview(
-      context,
-      name: name.text.trim(),
-      description: description.text.trim(),
-      price: int.parse(price.text),
-      stock: int.parse(stock.text),
-      published: published,
+        const SizedBox(height: 24),
+      ],
     );
   }
 
-  Future<void> save() async {
-    if (!form.currentState!.validate()) return;
-    setState(() => saving = true);
+  Future<void> preview() async {
+    if (saving ||
+        previewing ||
+        ref.read(imageDraftProvider(imageKey)).reading ||
+        !form.currentState!.validate()) {
+      return;
+    }
+    setState(() => previewing = true);
     try {
-      await ref
-          .read(repositoryProvider)
-          .saveProduct(
+      await showProductPreview(
+        context,
+        name: name.text.trim(),
+        description: description.text.trim(),
+        price: int.parse(price.text),
+        stock: int.parse(stock.text),
+        published: published,
+        images: ref.read(imageDraftProvider(imageKey)).images,
+      );
+    } finally {
+      if (mounted) setState(() => previewing = false);
+    }
+  }
+
+  Future<void> save() async {
+    if (saving ||
+        ref.read(imageDraftProvider(imageKey)).reading ||
+        !form.currentState!.validate()) {
+      return;
+    }
+    setState(() {
+      saving = true;
+      uploadProgress = 0;
+    });
+    try {
+      final warning = await ref
+          .read(productImageServiceProvider)
+          .save(
             Product(
-              id:
-                  widget.product?.id ??
-                  'p${DateTime.now().microsecondsSinceEpoch}',
+              id: productId,
               shopId: demoShopId,
               name: name.text.trim(),
               description: description.text.trim(),
               price: int.parse(price.text),
               stock: int.parse(stock.text),
               published: published,
+              images: ref.read(imageDraftProvider(imageKey)).images,
             ),
+            onProgress: (progress) {
+              if (mounted) setState(() => uploadProgress = progress);
+            },
           );
       ref.invalidate(productsProvider(demoShopId));
       if (mounted) {
-        showMessage(context, '商品を保存しました');
+        showMessage(context, warning ?? '商品を保存しました');
         context.go('/admin/products');
       }
+    } on ImageStorageException catch (error) {
+      if (mounted) showMessage(context, error.message);
     } catch (_) {
       if (mounted) showMessage(context, '保存できませんでした。再試行してください。');
     } finally {
@@ -822,7 +878,7 @@ class AdminProductDetail extends ConsumerWidget {
               child: const Text('編集'),
             ),
           ),
-          const ImagePlaceholder(height: 280),
+          ProductImageGallery(images: p.images, height: 280),
           const SizedBox(height: 24),
           Text(yen(p.price), style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 12),

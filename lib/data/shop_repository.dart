@@ -42,7 +42,7 @@ class MockShopRepository implements ShopRepository {
     _products.removeWhere(
       (p) => p.id == product.id && p.shopId == product.shopId,
     );
-    _products.add(product);
+    _products.add(product.withImages(product.images));
   }
 
   @override
