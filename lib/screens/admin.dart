@@ -165,7 +165,7 @@ class AdminShell extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'デモワークスペース',
+                  'ショップ管理',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 SizedBox(height: 6),
@@ -182,7 +182,7 @@ class AdminShell extends ConsumerWidget {
     final shop = ref.watch(shopProvider(demoShopId)).asData?.value;
     final appBar = AppBar(
       title: Text(
-        shop?.name ?? 'ショップ管理',
+        shop == null || shop.name.trim().isEmpty ? 'ショップ名を設定してください' : shop.name,
         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
       ),
       elevation: 0,
@@ -277,11 +277,11 @@ class Dashboard extends ConsumerWidget {
             );
             final stats = [
               (
-                '今月の売上（サンプル）',
+                '今月の売上',
                 yen(month.fold<int>(0, (sum, o) => sum + o.total)),
                 Icons.payments_outlined,
               ),
-              ('今月の注文数（サンプル）', '${month.length}件', Icons.shopping_bag_outlined),
+              ('今月の注文数', '${month.length}件', Icons.shopping_bag_outlined),
               ('登録商品数', '${products.length}点', Icons.inventory_2_outlined),
               (
                 '公開中の商品数',
@@ -342,7 +342,7 @@ class Dashboard extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 32),
-                const PageHeading('最近の注文', 'サンプルデータです。実際の注文は発生しません。'),
+                const PageHeading('最近の注文', '注文状況を確認できます。'),
                 OrderList(orders: orders.take(5).toList()),
               ],
             );
@@ -386,6 +386,49 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         value: ref.watch(productsProvider(demoShopId)),
         retry: () => ref.invalidate(productsProvider(demoShopId)),
         builder: (products) {
+          if (products.isEmpty) {
+            return Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 48,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 44,
+                        color: Color(0xFF64748B),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        '商品がまだ登録されていません',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        '最初の商品を登録して、ショップを始めましょう。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: () => context.go('/admin/products/new'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('商品を登録する'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
           final filtered = products
               .where(
                 (p) =>
@@ -802,7 +845,7 @@ class OrderList extends StatelessWidget {
   final List<ShopOrder> orders;
   @override
   Widget build(BuildContext context) => orders.isEmpty
-      ? const Center(child: Text('注文はありません'))
+      ? const Center(child: Text('注文はまだありません'))
       : Column(
           children: orders
               .map(
@@ -838,7 +881,7 @@ class OrdersPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const PageHeading('注文管理', 'サンプル注文を表示しています。実際の注文は発生しません。'),
+      const PageHeading('注文管理', '注文情報を一覧で確認できます。'),
       AsyncView(
         value: ref.watch(ordersProvider(demoShopId)),
         retry: () => ref.invalidate(ordersProvider(demoShopId)),
@@ -862,7 +905,7 @@ class OrderDetail extends ConsumerWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHeading('注文 $id', 'サンプル注文'),
+          PageHeading('注文 $id', '注文情報を確認できます。'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(24),
